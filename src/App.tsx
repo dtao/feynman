@@ -96,9 +96,10 @@ export function App() {
     );
   }
 
+  const step = T.nextStep(session);
   const ph = T.phase(session);
   const rootNode = T.root(session);
-  const next = ph === "learning" ? T.nextToLearn(session) : undefined;
+  const next = step.kind === "learn" ? step.node : undefined;
   const picked = selected && session.nodes[selected.id] ? session.nodes[selected.id] : undefined;
   const shown = picked ?? next;
   const st = T.stats(session);
@@ -111,10 +112,10 @@ export function App() {
       <>
         {picked && (
           <button className="link-btn back" onClick={() => setSelected(null)}>
-            ← {ph === "complete" ? "Back to the summary" : ph === "mapping" ? "Back to mapping" : "Back to the current lesson"}
+            ← {ph === "complete" ? "Back to the summary" : ph === "mapping" ? "Back to where I was" : "Back to the current lesson"}
           </button>
         )}
-        {!picked && <div className="step">Lesson · {st.pending} to go</div>}
+        {!picked && <div className="step">Lesson</div>}
         <NodeView
           key={`${shown.id}:${selected?.explain ? "x" : ""}`}
           session={session}
@@ -128,8 +129,8 @@ export function App() {
   } else if (ph === "mapping") {
     main = (
       <>
-        <div className="step">Mapping what you need to learn</div>
-        <Mapping session={session} update={update} />
+        <div className="step">{step.kind === "triage" ? "What do you already know?" : "Breaking it down"}</div>
+        <Mapping session={session} step={step} update={update} />
       </>
     );
   } else {
@@ -174,7 +175,7 @@ export function App() {
       {keyDialog}
       <div className={`workspace ${ph}`}>
         <main className="main">{main}</main>
-        <TreeView session={session} activeId={verdict ? undefined : shown?.id} onSelect={(id) => { setVerdict(null); setSelected({ id }); }} />
+        <TreeView session={session} activeId={verdict ? undefined : (shown ?? (step.kind !== "done" ? step.node : undefined))?.id} onSelect={(id) => { setVerdict(null); setSelected({ id }); }} />
       </div>
     </div>
   );

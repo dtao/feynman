@@ -38,14 +38,9 @@ export function postOrder(s: Session, id: string = s.rootId): TNode[] {
   return [...s.nodes[id].children.flatMap((c) => postOrder(s, c)), s.nodes[id]];
 }
 
-export function breadthFirst(s: Session): TNode[] {
-  const out: TNode[] = [];
-  for (let queue = [s.rootId]; queue.length; ) {
-    const n = s.nodes[queue.shift()!];
-    out.push(n);
-    queue.push(...n.children);
-  }
-  return out;
+/** Parents before their children, siblings in order. */
+export function preOrder(s: Session, id: string = s.rootId): TNode[] {
+  return [s.nodes[id], ...s.nodes[id].children.flatMap((c) => preOrder(s, c))];
 }
 
 /** The latest passing explanation, if any: the "locked in" one. */
@@ -76,32 +71,53 @@ export function contextFor(s: Session, id: string): NodeContext {
   };
 }
 
-// ---------- phases ----------
+// ---------- what happens next ----------
+
+/**
+ * The single next thing to do, found depth-first: go down into the first component I don't
+ * understand, sort its pieces, and keep descending until something can be taught. Only when a
+ * component is fully understood does the walk move on to its next sibling. So one branch is
+ * mapped and learned to the top before the next branch is even broken down.
+ *
+ * triage – tell the app which of this node's components I already understand
+ * wait   – this node is being broken down (or failed to, and can be retried)
+ * learn  – everything beneath this node is understood: teach it
+ * done   – nothing left
+ */
+export type Step = { kind: "triage" | "wait" | "learn"; node: TNode } | { kind: "done" };
+
+export function nextStep(s: Session, id: string = s.rootId): Step {
+  const n = s.nodes[id];
+  if (n.status === "pending") {
+    if (n.expansion === "triage") return { kind: "triage", node: n };
+    if (n.expansion !== "done" && n.expansion !== "leaf") return { kind: "wait", node: n };
+  }
+  for (const c of n.children) {
+    const step = nextStep(s, c);
+    if (step.kind !== "done") return step;
+  }
+  return n.status === "pending" ? { kind: "learn", node: n } : { kind: "done" };
+}
 
 export type Phase = "mapping" | "learning" | "complete";
 
-const UNMAPPED = new Set(["none", "loading", "triage", "error"]);
-
 export function phase(s: Session): Phase {
-  const pending = Object.values(s.nodes).filter((n) => n.status === "pending");
-  if (pending.some((n) => UNMAPPED.has(n.expansion))) return "mapping";
-  return pending.length ? "learning" : "complete";
+  const kind = nextStep(s).kind;
+  return kind === "done" ? "complete" : kind === "learn" ? "learning" : "mapping";
 }
 
-/** Pending nodes that still need a breakdown request. Children wait until their parent has been triaged. */
+/**
+ * Pending nodes that need a breakdown request. Children wait until their parent has been triaged,
+ * and triage happens depth-first, so this only ever reaches the siblings along the current branch.
+ */
 export function nodesToExpand(s: Session): TNode[] {
-  return breadthFirst(s).filter(
+  return preOrder(s).filter(
     (n) => n.status === "pending" && n.expansion === "none" && (!n.parentId || s.nodes[n.parentId].expansion === "done"),
   );
 }
 
-export const triageQueue = (s: Session) => breadthFirst(s).filter((n) => n.expansion === "triage");
-
 export const isLearnable = (s: Session, n: TNode) =>
   n.status === "pending" && (n.expansion === "leaf" || n.expansion === "done") && kids(s, n.id).every((c) => c.status !== "pending");
-
-/** The lowest unlearned piece whose own components are all understood. */
-export const nextToLearn = (s: Session) => postOrder(s).find((n) => isLearnable(s, n));
 
 export function stats(s: Session) {
   const all = Object.values(s.nodes);

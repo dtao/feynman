@@ -3,10 +3,11 @@
 An app for learning complex things by breaking them down until you hit what you already know, then building back up.
 
 1. **Say what you want to understand.** The app identifies the topic and breaks it into components.
-2. **Tick what you already understand.** Every component you don't know is broken down again, recursively, until
-   every unknown piece is small enough to teach directly.
-3. **Learn bottom-up.** Lessons start at the lowest pieces and work up to the topic, each one building on the
-   pieces beneath it. You can ask follow-up questions, or ask for a piece to be broken down further.
+2. **Tick what you already understand.** The app then goes depth-first: it takes the first component you don't
+   know, breaks it down, asks again, and keeps descending until it reaches a piece small enough to teach directly.
+3. **Learn bottom-up, one branch at a time.** Lessons start at the lowest pieces and work up, each building on
+   the pieces beneath it. A component is fully understood before the next one is even broken down. You can ask
+   follow-up questions, or ask for a piece to be broken down further.
 4. **Watch the map light up.** The tree of everything you need starts gray and turns green as you understand
    each piece. At the end it is a picture of everything you learned.
 5. **Explain it back (optional, at any level).** Write the idea in your own words and the app checks it. A pass

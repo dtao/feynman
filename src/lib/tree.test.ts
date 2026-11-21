@@ -34,7 +34,7 @@ describe("mapping", () => {
     s = T.applyDecomposition(s, s.rootId, split("X", ["A", "B"]));
     expect(T.root(s).title).toBe("X");
     expect(T.nodesToExpand(s)).toEqual([]);
-    expect(T.triageQueue(s).map((n) => n.title)).toEqual(["X"]);
+    expect(T.nextStep(s)).toMatchObject({ kind: "triage", node: { title: "X" } });
     s = T.applyTriage(s, s.rootId, [byTitle(s, "A").id]);
     expect(T.nodesToExpand(s).map((n) => n.title)).toEqual(["B"]);
     expect(byTitle(s, "A").status).toBe("known");
@@ -52,8 +52,38 @@ describe("mapping", () => {
     expect(T.phase(s)).toBe("learning");
   });
 
-  it("moves to learning once everything unknown is mapped", () => {
-    expect(T.phase(mapped())).toBe("learning");
+  it("goes depth-first: finishes one component before breaking down the next", () => {
+    let s = T.newSession("x");
+    s = T.applyDecomposition(s, s.rootId, split("X", ["A", "B"]));
+    s = T.applyTriage(s, s.rootId, []);
+    // Both siblings are requested, but A's breakdown is what the learner waits for.
+    expect(T.nodesToExpand(s).map((n) => n.title)).toEqual(["A", "B"]);
+    expect(T.nextStep(s)).toMatchObject({ kind: "wait", node: { title: "A" } });
+
+    // B arriving first does not jump the queue.
+    s = T.applyDecomposition(s, byTitle(s, "B").id, split("B", ["B1"]));
+    expect(T.nextStep(s)).toMatchObject({ kind: "wait", node: { title: "A" } });
+
+    s = T.applyDecomposition(s, byTitle(s, "A").id, split("A", ["A1", "A2"]));
+    expect(T.nextStep(s)).toMatchObject({ kind: "triage", node: { title: "A" } });
+    s = T.applyTriage(s, byTitle(s, "A").id, [byTitle(s, "A2").id]);
+    s = T.applyDecomposition(s, byTitle(s, "A1").id, atomic("A1"));
+
+    // A1 is taught while B is still unsorted, then A itself, and only then B.
+    expect(T.nextStep(s)).toMatchObject({ kind: "learn", node: { title: "A1" } });
+    expect(T.phase(s)).toBe("learning");
+    s = T.markLearned(s, byTitle(s, "A1").id);
+    expect(T.nextStep(s)).toMatchObject({ kind: "learn", node: { title: "A" } });
+    s = T.markLearned(s, byTitle(s, "A").id);
+    expect(T.nextStep(s)).toMatchObject({ kind: "triage", node: { title: "B" } });
+    expect(T.phase(s)).toBe("mapping");
+  });
+
+  it("finds unlearned pieces beneath something already understood", () => {
+    let s = mapped();
+    for (let st = T.nextStep(s); st.kind === "learn"; st = T.nextStep(s)) s = T.markLearned(s, st.node.id);
+    s = T.markUnlearned(s, byTitle(s, "B1").id);
+    expect(T.nextStep(s)).toMatchObject({ kind: "learn", node: { title: "B1" } });
   });
 });
 
@@ -61,9 +91,9 @@ describe("learning", () => {
   it("teaches bottom-up and finishes at the root", () => {
     let s = mapped();
     const order: string[] = [];
-    for (let n = T.nextToLearn(s); n; n = T.nextToLearn(s)) {
-      order.push(n.title);
-      s = T.markLearned(s, n.id);
+    for (let st = T.nextStep(s); st.kind === "learn"; st = T.nextStep(s)) {
+      order.push(st.node.title);
+      s = T.markLearned(s, st.node.id);
     }
     expect(order).toEqual(["B1", "B2", "B", "C", "X"]);
     expect(T.phase(s)).toBe("complete");
@@ -82,7 +112,7 @@ describe("learning", () => {
 
 describe("explaining it back", () => {
   const learnAll = (s: Session) => {
-    for (let n = T.nextToLearn(s); n; n = T.nextToLearn(s)) s = T.markLearned(s, n.id);
+    for (let st = T.nextStep(s); st.kind === "learn"; st = T.nextStep(s)) s = T.markLearned(s, st.node.id);
     return s;
   };
   const fail = (weak: number[]) => ({ passed: false, feedback: "Not quite.", gaps: ["gap"], weakComponents: weak });
@@ -107,7 +137,7 @@ describe("explaining it back", () => {
     expect(T.lockedIn(byTitle(s, "B"))).toBeUndefined();
     expect(byTitle(s, "B").attempts).toHaveLength(1);
     expect(T.phase(s)).toBe("learning");
-    expect(T.nextToLearn(s)?.title).toBe("B2");
+    expect(T.nextStep(s)).toMatchObject({ kind: "learn", node: { title: "B2" } });
   });
 
   it("breaks down a component I claimed to know when the check shows I don't", () => {
@@ -124,14 +154,14 @@ describe("explaining it back", () => {
     s = T.applyValidation(s, id, "hmm", fail([])).session;
     expect(s.nodes[id]).toMatchObject({ status: "pending", expansion: "leaf", chat: [] });
     expect(s.nodes[id].reviewNote).toContain("Not quite.");
-    expect(T.nextToLearn(s)?.id).toBe(id);
+    expect(T.nextStep(s)).toMatchObject({ kind: "learn", node: { id } });
   });
 
   it("can break a leaf down further on request", () => {
     let s = mapped();
     const id = byTitle(s, "C").id;
     s = T.breakDown(s, id);
-    expect(T.phase(s)).toBe("mapping");
+    expect(T.nodesToExpand(s).map((n) => n.title)).toEqual(["C"]);
     expect(T.contextFor(s, id).forceSplit).toBe(true);
     s = T.applyDecomposition(s, id, split("C", ["C1"]));
     expect(s.nodes[id].forceSplit).toBeUndefined();

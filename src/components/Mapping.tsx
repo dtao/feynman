@@ -7,28 +7,22 @@ interface Props {
   update: (fn: (s: Session) => Session) => void;
 }
 
-/** The mapping phase: sort each breakdown into "know it" / "don't", until every unknown piece is found. */
-export function Mapping({ session, update }: Props) {
-  const queue = T.triageQueue(session);
-  const all = Object.values(session.nodes);
-  const loading = [...all.filter((n) => n.expansion === "loading"), ...T.nodesToExpand(session)];
-  const failed = all.filter((n) => n.expansion === "error");
-
+/** Sorting a breakdown into "know it" / "don't", or waiting for the next breakdown to arrive. */
+export function Mapping({ session, step, update }: Props & { step: T.Step }) {
+  const failed = Object.values(session.nodes).filter((n) => n.expansion === "error");
   return (
     <>
-      {queue[0] && <Triage key={queue[0].id} session={session} node={queue[0]} remaining={queue.length - 1} update={update} />}
+      {step.kind === "triage" && <Triage key={step.node.id} session={session} node={step.node} update={update} />}
       {failed.map((n) => (
         <div key={n.id} className="card note error">
           Couldn't break down <b>{n.title || "your topic"}</b>: {n.error}{" "}
           <button className="link-btn" onClick={() => update((s) => T.setExpansion(s, n.id, "none"))}>Try again</button>
         </div>
       ))}
-      {loading.length > 0 && (
-        <div className={queue[0] ? "side-status" : "card"}>
+      {step.kind === "wait" && step.node.expansion !== "error" && (
+        <div className="card">
           <p className="thinking">
-            {T.root(session).title
-              ? <>Breaking down {loading.map((n) => n.title).filter(Boolean).join(", ") || "the next piece"}…</>
-              : <>Working out what "{session.goal}" is built from…</>}
+            {step.node.title ? <>Breaking down {step.node.title}…</> : <>Working out what "{session.goal}" is built from…</>}
           </p>
         </div>
       )}
@@ -36,7 +30,7 @@ export function Mapping({ session, update }: Props) {
   );
 }
 
-function Triage({ session, node, remaining, update }: Props & { node: TNode; remaining: number }) {
+function Triage({ session, node, update }: Props & { node: TNode }) {
   const children = T.kids(session, node.id);
   // Components settled on an earlier pass (possible after a re-breakdown) are not asked about again.
   const open = children.filter((c) => c.status === "pending" && c.expansion === "none");
@@ -56,7 +50,7 @@ function Triage({ session, node, remaining, update }: Props & { node: TNode; rem
       {node.description && <p className="lede">{node.description}</p>}
       <p>
         {isRoot ? "It's built from these pieces. " : "To understand this, you need these pieces. "}
-        <b>Tick the ones you already understand</b>; everything else gets broken down further.
+        <b>Tick the ones you already understand</b>. You'll work through the rest one at a time, each broken down as far as it needs.
       </p>
       <ul className="choices">
         {open.map((c) => (
@@ -75,7 +69,6 @@ function Triage({ session, node, remaining, update }: Props & { node: TNode; rem
         <button className="btn primary" onClick={() => update((s) => T.applyTriage(s, node.id, [...known]))}>
           {known.size === 0 ? "I don't know any of these yet" : known.size === open.length ? "I know all of these" : `Continue (${known.size} known)`}
         </button>
-        {remaining > 0 && <span className="muted">{remaining} more to sort after this</span>}
       </div>
     </article>
   );
