@@ -19,26 +19,36 @@ Requires Node 22+ and an [Anthropic API key](https://console.anthropic.com/).
 
 ```bash
 npm install
-cp .env.example .env      # then put your key in ANTHROPIC_API_KEY
 npm run dev               # http://localhost:5173
 ```
 
-For a production build: `npm run build && npm start`.
+The app asks for your key the first time and keeps it in the browser. To try the interface without a key,
+`npm run dev:mock` uses canned breakdowns and lessons.
 
-To try the interface without a key or API calls, `npm run dev:mock` serves canned breakdowns and lessons.
+## Host it
 
-| Variable | Default | |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | | Read by the Anthropic SDK. |
-| `FEYNMAN_MODEL` | `claude-opus-5-5` | Model used for breakdowns, lessons and checks. |
-| `PORT` | `5173` | |
-| `FEYNMAN_MOCK` | | `1` for canned responses. |
+Feynman is a static site with no server. `npm run build` writes it to `dist/`, which can be served from any static
+host and from any folder (asset paths are relative).
+
+Set `VITE_FEYNMAN_MODEL` at build time to use a model other than `claude-opus-5-5`.
+
+## Your API key
+
+The browser calls the Anthropic API directly, so each person uses their own key and pays for their own usage.
+The key is stored in that browser's `localStorage` and sent only to `api.anthropic.com`. Any script that runs
+on the page could read it, so:
+
+- Use a dedicated key with a spend limit, and revoke it if in doubt. "API key → Forget key" removes it from the browser.
+- The production build ships a Content-Security-Policy that allows only the app's own scripts and connections
+  only to the Anthropic API. Model-written lesson text is sanitized before it is rendered.
+- Host it on its own origin (its own domain or subdomain). `localStorage` is shared by everything on an origin,
+  so on a shared one such as `username.github.io`, other sites under that name could read the key.
 
 ## How it's built
 
-- `server/` is a small Express server. `llm.ts` holds the three Claude calls and their prompts: `decompose`
-  (structured output), `teach` (streamed) and `validate` (structured output). `mock.ts` is the canned stand-in.
+- `src/lib/llm.ts` holds the three Claude calls and their prompts: `decompose` (structured output), `teach`
+  (streamed) and `validate` (structured output). `mock.ts` is the canned stand-in.
 - `src/lib/tree.ts` is the whole learning model as pure functions over a session: mapping, lesson order,
   what a failed check resets, and the tree layout. `tree.test.ts` covers it (`npm test`).
 - `src/components/` is the React UI. Topics, lessons and your explanations are stored in the browser's
-  `localStorage`; the server keeps no state.
+  `localStorage`.

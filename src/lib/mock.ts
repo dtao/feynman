@@ -1,8 +1,8 @@
-// Canned responses so the app can be developed and tested without API calls (FEYNMAN_MOCK=1).
-import type { ChatMessage, DecomposeResult, NodeContext, ValidateResult } from "../src/types.ts";
+// Canned responses so the app can be developed and tested without a key or API calls (VITE_MOCK=1).
+import type { ChatMessage, DecomposeResult, NodeContext, ValidateResult } from "../types.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const DELAY = Number(process.env.FEYNMAN_MOCK_DELAY ?? 300);
+const DELAY = Number(import.meta.env.VITE_MOCK_DELAY ?? 300);
 
 export async function decompose(ctx: NodeContext): Promise<DecomposeResult> {
   await sleep(DELAY);
@@ -21,7 +21,7 @@ export async function decompose(ctx: NodeContext): Promise<DecomposeResult> {
   };
 }
 
-export async function* teach(ctx: NodeContext, chat: ChatMessage[]): AsyncGenerator<string> {
+export async function teach(ctx: NodeContext, chat: ChatMessage[], onDelta: (text: string) => void, signal: AbortSignal): Promise<string> {
   const text = chat.length
     ? `Good question. In short: it follows from how **${ctx.title}** is put together.`
     : [
@@ -34,12 +34,14 @@ export async function* teach(ctx: NodeContext, chat: ChatMessage[]): AsyncGenera
       ].filter(Boolean).join("\n\n");
   for (const word of text.split(/(?<=\s)/)) {
     await sleep(DELAY / 30);
-    yield word;
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    onDelta(word);
   }
+  return text;
 }
 
 /** Passes unless the explanation is very short or contains "wrong". */
-export async function validate(ctx: NodeContext, explanation: string): Promise<ValidateResult> {
+export async function validate(ctx: NodeContext, _lesson: string | undefined, explanation: string): Promise<ValidateResult> {
   await sleep(DELAY);
   const passed = explanation.trim().length >= 40 && !/wrong/i.test(explanation);
   return passed

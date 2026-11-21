@@ -60,7 +60,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .brand { font-family: "Iowan Old Style", Palatino, Georgia, serif; font-size: 1.15rem; font-weight: 700; background: none; border: 0; padding: 0; cursor: pointer; }
 .brand:disabled { cursor: default; }
 .topbar-title { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.topbar .link-btn { margin-left: auto; white-space: nowrap; }
+.topbar .link-btn { white-space: nowrap; }
 
 /* ---------- buttons ---------- */
 .btn { border: 1px solid var(--line); background: var(--card); border-radius: 9px; padding: 9px 16px; cursor: pointer; font-weight: 550; }
@@ -78,7 +78,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .home h1 { font-size: 2.3rem; }
 .lede { color: var(--muted); font-size: 1.05rem; }
 .home form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; margin-top: 22px; }
-textarea, .ask input {
+textarea, .ask input, .key-dialog input {
   width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 12px 14px; resize: vertical;
 }
 .topics { margin-top: 52px; }
@@ -194,3 +194,10 @@ textarea, .ask input {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---------- API key ---------- */
+.banner { background: var(--warn-bg); color: var(--warn-ink); padding: 8px 20px; font-size: 0.93rem; flex: none; }
+.key-dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); padding: 26px 28px; width: min(520px, calc(100vw - 32px)); box-shadow: var(--shadow); }
+.key-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.key-dialog input { margin-top: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
+.key-dialog code { font-size: 0.88rem; }

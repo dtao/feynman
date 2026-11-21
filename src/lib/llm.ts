@@ -1,14 +1,27 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
-import type { ChatMessage, DecomposeResult, NodeContext, ValidateResult } from "../src/types.ts";
+import type { ChatMessage, DecomposeResult, NodeContext, ValidateResult } from "../types.ts";
+import { loadKey } from "./store.ts";
 
-const MODEL = process.env.FEYNMAN_MODEL || "claude-opus-5-5";
+const MODEL = import.meta.env.VITE_FEYNMAN_MODEL || "claude-opus-5-5";
 // If a safety classifier declines a request, let the API retry it on a fallback model.
 const BETAS = ["server-side-fallback-2026-07-01"];
 
-let _client: Anthropic | undefined;
-const client = () => (_client ??= new Anthropic());
+export class MissingKeyError extends Error {
+  constructor() {
+    super("Add your Anthropic API key first (API key, top right).");
+  }
+}
+
+// The app has no server: the browser calls the Anthropic API directly with the key the user stored.
+let cached: { key: string; client: Anthropic } | undefined;
+function client(): Anthropic {
+  const key = loadKey();
+  if (!key) throw new MissingKeyError();
+  if (cached?.key !== key) cached = { key, client: new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true }) };
+  return cached.client;
+}
 
 export const modelName = () => MODEL;
 
@@ -105,20 +118,33 @@ How to teach it:
 
 After the lesson the learner may ask follow-up questions. Answer them directly and briefly, staying on this concept and at this level.`;
 
-export function teachStream(ctx: NodeContext, chat: ChatMessage[]) {
+/** Streams a lesson, or a follow-up answer when `chat` is non-empty. Resolves with the full text. */
+export async function teach(ctx: NodeContext, chat: ChatMessage[], onDelta: (text: string) => void, signal: AbortSignal): Promise<string> {
   let first = `${describeContext(ctx)}\n\nTeach me: ${ctx.title}`;
   if (ctx.reviewNote) {
     first += `\n\nI tried to explain this back and did not pass. Notes from that check: """${ctx.reviewNote}"""`;
   }
-  return client().beta.messages.stream({
-    model: MODEL,
-    max_tokens: 64000,
-    betas: BETAS,
-    fallbacks: "default",
-    output_config: { effort: "medium" },
-    system: TEACH_SYSTEM,
-    messages: [{ role: "user", content: first }, ...chat],
+  const stream = client().beta.messages.stream(
+    {
+      model: MODEL,
+      max_tokens: 64000,
+      betas: BETAS,
+      fallbacks: "default",
+      output_config: { effort: "medium" },
+      system: TEACH_SYSTEM,
+      messages: [{ role: "user", content: first }, ...chat],
+    },
+    { signal },
+  );
+  let full = "";
+  stream.on("text", (text) => {
+    full += text;
+    onDelta(text);
   });
+  const final = await stream.finalMessage();
+  if (final.stop_reason === "refusal") throw new Error("The model declined to continue this lesson.");
+  if (final.stop_reason === "max_tokens") throw new Error("The lesson was cut off before it finished. Try again.");
+  return full;
 }
 
 // ---------- validate ----------
@@ -164,26 +190,14 @@ export async function validate(ctx: NodeContext, lesson: string | undefined, exp
   return { ...out, weakComponents: weak };
 }
 
-/** A message safe to show in the UI. */
-export function describeError(err: unknown): { status: number; message: string } {
-  if (err instanceof Anthropic.AuthenticationError) {
-    return { status: 401, message: "No valid Anthropic credentials. Set ANTHROPIC_API_KEY in .env (see .env.example) and restart." };
+/** Turns an SDK failure into a message worth showing. */
+export function describeError(err: unknown): Error {
+  if (err instanceof MissingKeyError) return err;
+  if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+    return new Error("Anthropic rejected your API key. Check or replace it under API key, top right.");
   }
-  if (err instanceof Anthropic.RateLimitError) {
-    return { status: 429, message: "Rate limited by the Anthropic API. Wait a moment and try again." };
-  }
-  if (err instanceof Anthropic.APIConnectionError) {
-    return { status: 502, message: "Could not reach the Anthropic API. Check your connection and try again." };
-  }
-  if (err instanceof Anthropic.APIError) {
-    return { status: err.status ?? 500, message: `Anthropic API error: ${err.message}` };
-  }
-  if (err instanceof Error) {
-    // The SDK throws a plain error when no credentials can be found at all.
-    if (/api[_ ]?key|auth/i.test(err.message)) {
-      return { status: 401, message: "No Anthropic credentials found. Set ANTHROPIC_API_KEY in .env (see .env.example) and restart." };
-    }
-    return { status: 500, message: err.message };
-  }
-  return { status: 500, message: "Something went wrong." };
+  if (err instanceof Anthropic.RateLimitError) return new Error("Rate limited by the Anthropic API. Wait a moment and try again.");
+  if (err instanceof Anthropic.APIConnectionError) return new Error("Could not reach the Anthropic API. Check your connection and try again.");
+  if (err instanceof Anthropic.APIError) return new Error(`Anthropic API error: ${err.message}`);
+  return err instanceof Error ? err : new Error("Something went wrong.");
 }

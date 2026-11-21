@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session, ValidateResult } from "./types.ts";
 import * as T from "./lib/tree.ts";
 import * as api from "./lib/api.ts";
-import { loadCurrent, loadSessions, saveCurrent, saveSessions } from "./lib/store.ts";
+import { loadCurrent, loadKey, loadSessions, saveCurrent, saveKey, saveSessions } from "./lib/store.ts";
+import { KeyDialog } from "./components/KeyDialog.tsx";
 import { Home } from "./components/Home.tsx";
 import { Mapping } from "./components/Mapping.tsx";
 import { NodeView } from "./components/NodeView.tsx";
@@ -21,13 +22,16 @@ export function App() {
   const [currentId, setCurrentId] = useState<string | null>(loadCurrent);
   const [selected, setSelected] = useState<{ id: string; explain?: boolean } | null>(null);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
-  const [mock, setMock] = useState(false);
+  const [apiKey, setApiKey] = useState(loadKey);
+  const [keyOpen, setKeyOpen] = useState(!api.isMock && !loadKey());
+  const mock = api.isMock;
+  /** Model calls can be made: there is a key, or responses are canned. */
+  const ready = mock || !!apiKey;
 
   const session = sessions.find((s) => s.id === currentId) ?? null;
 
   useEffect(() => saveSessions(sessions), [sessions]);
   useEffect(() => saveCurrent(currentId), [currentId]);
-  useEffect(() => { api.health().then((h) => setMock(h.mock)).catch(() => {}); }, []);
 
   const updateById = useCallback(
     (id: string, fn: (s: Session) => Session) => setSessions((all) => all.map((s) => (s.id === id ? fn(s) : s))),
@@ -38,7 +42,7 @@ export function App() {
   // Break down every unknown piece as soon as it is identified.
   const inFlight = useRef(new Set<string>());
   useEffect(() => {
-    if (!session) return;
+    if (!session || !ready) return;
     const sid = session.id;
     for (const n of T.nodesToExpand(session)) {
       if (inFlight.current.size >= MAX_PARALLEL_BREAKDOWNS) break;
@@ -51,7 +55,7 @@ export function App() {
         (e: Error) => { inFlight.current.delete(n.id); updateById(sid, (s) => T.setExpansion(s, n.id, "error", e.message)); },
       );
     }
-  }, [session, updateById]);
+  }, [session, ready, updateById]);
 
   function open(id: string | null) {
     setCurrentId(id);
@@ -60,10 +64,19 @@ export function App() {
   }
 
   function start(goal: string) {
+    if (!ready) return setKeyOpen(true);
     const s = T.newSession(goal);
     setSessions((all) => [...all, s]);
     open(s.id);
   }
+
+  function changeKey(key: string) {
+    saveKey(key);
+    setApiKey(key);
+    setKeyOpen(false);
+  }
+  const keyDialog = <KeyDialog open={keyOpen} current={apiKey} onSave={changeKey} onClose={() => setKeyOpen(false)} />;
+  const onKey = mock ? undefined : () => setKeyOpen(true);
 
   function onVerdict(nodeId: string, text: string, result: ValidateResult) {
     if (!session) return;
@@ -76,8 +89,9 @@ export function App() {
   if (!session) {
     return (
       <div className="shell">
-        <TopBar mock={mock} />
+        <TopBar mock={mock} hasKey={!!apiKey} onKey={onKey} />
         <Home sessions={sessions} onStart={start} onOpen={open} onDelete={(id) => setSessions((all) => all.filter((s) => s.id !== id))} />
+        {keyDialog}
       </div>
     );
   }
@@ -151,7 +165,13 @@ export function App() {
 
   return (
     <div className="shell">
-      <TopBar mock={mock} title={rootNode.title || session.goal} onHome={() => open(null)} />
+      <TopBar mock={mock} hasKey={!!apiKey} onKey={onKey} title={rootNode.title || session.goal} onHome={() => open(null)} />
+      {!ready && (
+        <div className="banner">
+          Add your Anthropic API key to continue. <button className="link-btn" onClick={() => setKeyOpen(true)}>Add key</button>
+        </div>
+      )}
+      {keyDialog}
       <div className={`workspace ${ph}`}>
         <main className="main">{main}</main>
         <TreeView session={session} activeId={verdict ? undefined : shown?.id} onSelect={(id) => { setVerdict(null); setSelected({ id }); }} />
@@ -160,13 +180,14 @@ export function App() {
   );
 }
 
-function TopBar({ mock, title, onHome }: { mock: boolean; title?: string; onHome?: () => void }) {
+function TopBar({ mock, hasKey, onKey, title, onHome }: { mock: boolean; hasKey: boolean; onKey?: () => void; title?: string; onHome?: () => void }) {
   return (
     <header className="topbar">
       <button className="brand" onClick={onHome} disabled={!onHome}>Feynman</button>
-      {title && <span className="topbar-title">{title}</span>}
-      {mock && <span className="chip warn" title="Canned lessons, no AI calls (FEYNMAN_MOCK=1)">Mock mode</span>}
+      <span className="topbar-title">{title}</span>
+      {mock && <span className="chip warn" title="Canned lessons, no AI calls (VITE_MOCK=1)">Mock mode</span>}
       {onHome && <button className="link-btn" onClick={onHome}>All topics</button>}
+      {onKey && <button className="link-btn" onClick={onKey}>{hasKey ? "API key" : "Add API key"}</button>}
     </header>
   );
 }
