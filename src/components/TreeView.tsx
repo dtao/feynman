@@ -14,9 +14,11 @@ interface Props {
   /** The node the main panel is showing. */
   activeId?: string;
   onSelect: (id: string) => void;
+  /** Whether the map tab is showing (phones). Used to re-centre on the active node when it opens. */
+  visible?: boolean;
 }
 
-export function TreeView({ session, activeId, onSelect }: Props) {
+export function TreeView({ session, activeId, onSelect, visible }: Props) {
   const { placed, cols, rows } = useMemo(() => T.layout(session), [session]);
   const pos = useMemo(
     () => new Map(placed.map((p) => [p.node.id, { x: PAD + p.col * (W + GAP_X), y: PAD + p.row * (H + GAP_Y) }])),
@@ -27,8 +29,8 @@ export function TreeView({ session, activeId, onSelect }: Props) {
 
   const activeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-  }, [activeId, placed.length]);
+    activeRef.current?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+  }, [activeId, placed.length, visible]);
 
   const st = T.stats(session);
   const done = st.known + st.learned;
@@ -42,10 +44,10 @@ export function TreeView({ session, activeId, onSelect }: Props) {
         <div className="tree-meta">
           <span>{done} of {st.total} understood</span>
           <span className="legend">
-            <i className="dot pending" /> to learn
-            <i className="dot known" /> already knew
-            <i className="dot learned" /> understood
-            <i className="dot learned locked" /> explained back
+            <span><i className="dot pending" /> to learn</span>
+            <span><i className="dot known" /> already knew</span>
+            <span><i className="dot learned" /> understood</span>
+            <span><i className="dot learned locked" /> explained back</span>
           </span>
         </div>
       </header>

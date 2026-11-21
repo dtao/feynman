@@ -22,6 +22,8 @@ export function App() {
   const [currentId, setCurrentId] = useState<string | null>(loadCurrent);
   const [selected, setSelected] = useState<{ id: string; explain?: boolean } | null>(null);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  /** On a phone the lesson and the map are separate tabs; on a wide screen both are always visible. */
+  const [tab, setTab] = useState<"main" | "map">("main");
   const [apiKey, setApiKey] = useState(loadKey);
   const [keyOpen, setKeyOpen] = useState(!api.isMock && !loadKey());
   const mock = api.isMock;
@@ -59,6 +61,7 @@ export function App() {
 
   function open(id: string | null) {
     setCurrentId(id);
+    setTab("main");
     setSelected(null);
     setVerdict(null);
   }
@@ -173,9 +176,22 @@ export function App() {
         </div>
       )}
       {keyDialog}
-      <div className={`workspace ${ph}`}>
+      <nav className="tabs" role="tablist" aria-label="View">
+        <button role="tab" aria-selected={tab === "main"} onClick={() => setTab("main")}>
+          {ph === "complete" && !picked ? "Summary" : "Lesson"}
+        </button>
+        <button role="tab" aria-selected={tab === "map"} onClick={() => setTab("map")}>
+          Map <span className="tab-count">{st.known + st.learned}/{st.total}</span>
+        </button>
+      </nav>
+      <div className={`workspace ${ph} show-${tab}`}>
         <main className="main">{main}</main>
-        <TreeView session={session} activeId={verdict ? undefined : (shown ?? (step.kind !== "done" ? step.node : undefined))?.id} onSelect={(id) => { setVerdict(null); setSelected({ id }); }} />
+        <TreeView
+          session={session}
+          visible={tab === "map"}
+          activeId={verdict ? undefined : (shown ?? (step.kind !== "done" ? step.node : undefined))?.id}
+          onSelect={(id) => { setVerdict(null); setSelected({ id }); setTab("main"); }}
+        />
       </div>
     </div>
   );

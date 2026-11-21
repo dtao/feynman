@@ -55,7 +55,7 @@ p { margin: 0.7em 0; }
 button, input, textarea { font: inherit; color: inherit; }
 .muted { color: var(--muted); font-size: 0.9rem; }
 
-.shell { display: flex; flex-direction: column; height: 100%; }
+.shell { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
 .topbar { display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-bottom: 1px solid var(--line); flex: none; }
 .brand { font-family: "Iowan Old Style", Palatino, Georgia, serif; font-size: 1.15rem; font-weight: 700; background: none; border: 0; padding: 0; cursor: pointer; }
 .brand:disabled { cursor: default; }
@@ -155,8 +155,9 @@ textarea, .ask input, .key-dialog input {
 .progress { height: 6px; background: var(--gray); border-radius: 99px; overflow: hidden; }
 .progress-bar { height: 100%; background: var(--green); border-radius: 99px; transition: width 0.5s ease; }
 .tree-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
-.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.dot { display: inline-block; width: 11px; height: 11px; border-radius: 4px; margin-left: 8px; border: 1.5px solid transparent; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.legend span { white-space: nowrap; }
+.dot { display: inline-block; width: 11px; height: 11px; border-radius: 4px; margin-right: 3px; vertical-align: -1px; border: 1.5px solid transparent; }
 .dot.pending { background: var(--gray); }
 .dot.known { background: var(--green-pale); border-color: var(--green); }
 .dot.learned { background: var(--green); }
@@ -185,11 +186,22 @@ textarea, .ask input, .key-dialog input {
 /* When everything is understood, the map is the result: give it the room. */
 .workspace.complete { grid-template-columns: minmax(340px, 460px) minmax(0, 1fr); }
 
+/* Phones: the lesson and the map are two full-screen tabs rather than two cramped panes. */
+.tabs { display: none; }
 @media (max-width: 860px) {
-  .workspace, .workspace.complete { grid-template-columns: 1fr; grid-template-rows: auto minmax(260px, 45vh); overflow-y: auto; }
-  .main { overflow: visible; padding-bottom: 24px; }
-  .tree-panel { border-left: 0; border-top: 1px solid var(--line); }
+  .tabs { display: flex; flex: none; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    flex: 1; background: none; border: 0; border-bottom: 3px solid transparent; padding: 11px 8px 8px;
+    font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--green); }
+  .tab-count { font-weight: 500; font-size: 0.85em; margin-left: 4px; }
+  .workspace, .workspace.complete { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .workspace.show-main .tree-panel, .workspace.show-map .main { display: none; }
+  .main { padding: 16px 12px 40px; }
+  .tree-panel { border-left: 0; }
   .card { padding: 20px 18px; }
+  .topbar { padding: 10px 14px; gap: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
