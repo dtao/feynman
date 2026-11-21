@@ -30,6 +30,9 @@ The app asks for your key the first time and keeps it in the browser. To try the
 Feynman is a static site with no server. `npm run build` writes it to `dist/`, which can be served from any static
 host and from any folder (asset paths are relative).
 
+`.github/workflows/deploy.yml` builds and publishes it to GitHub Pages on every push to `main`. For that to work,
+the repository's Pages source (Settings → Pages) must be set to "GitHub Actions".
+
 Set `VITE_FEYNMAN_MODEL` at build time to use a model other than `claude-opus-5-5`.
 
 ## Your API key
