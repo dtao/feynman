@@ -110,7 +110,7 @@ describe("learning", () => {
   });
 });
 
-describe("explaining it back", () => {
+describe("confirming with a question", () => {
   const learnAll = (s: Session) => {
     for (let st = T.nextStep(s); st.kind === "learn"; st = T.nextStep(s)) s = T.markLearned(s, st.node.id);
     return s;
@@ -120,7 +120,7 @@ describe("explaining it back", () => {
   it("locks in a passing explanation", () => {
     let s = mapped();
     const id = byTitle(s, "B1").id;
-    s = T.applyValidation(s, id, "my words", { passed: true, feedback: "Yes.", gaps: [], weakComponents: [] }).session;
+    s = T.applyValidation(s, id, "Q?", "my words", { passed: true, feedback: "Yes.", gaps: [], weakComponents: [] }).session;
     expect(s.nodes[id].status).toBe("learned");
     expect(T.lockedIn(s.nodes[id])?.text).toBe("my words");
   });
@@ -128,7 +128,7 @@ describe("explaining it back", () => {
   it("sends me back one level on a fail", () => {
     let s = learnAll(mapped());
     const b = byTitle(s, "B");
-    const r = T.applyValidation(s, b.id, "hmm", fail([1]));
+    const r = T.applyValidation(s, b.id, "Q?", "hmm", fail([1]));
     s = r.session;
     expect(r.sentBackTo).toEqual([byTitle(s, "B2").id]);
     expect(byTitle(s, "B").status).toBe("pending");
@@ -142,7 +142,7 @@ describe("explaining it back", () => {
 
   it("breaks down a component I claimed to know when the check shows I don't", () => {
     let s = learnAll(mapped());
-    s = T.applyValidation(s, s.rootId, "hmm", fail([0])).session;
+    s = T.applyValidation(s, s.rootId, "Q?", "hmm", fail([0])).session;
     expect(byTitle(s, "A").status).toBe("pending");
     expect(T.phase(s)).toBe("mapping");
     expect(T.nodesToExpand(s).map((n) => n.title)).toEqual(["A"]);
@@ -151,7 +151,7 @@ describe("explaining it back", () => {
   it("re-teaches a leaf with the feedback as a note", () => {
     let s = learnAll(mapped());
     const id = byTitle(s, "C").id;
-    s = T.applyValidation(s, id, "hmm", fail([])).session;
+    s = T.applyValidation(s, id, "Q?", "hmm", fail([])).session;
     expect(s.nodes[id]).toMatchObject({ status: "pending", expansion: "leaf", chat: [] });
     expect(s.nodes[id].reviewNote).toContain("Not quite.");
     expect(T.nextStep(s)).toMatchObject({ kind: "learn", node: { id } });
@@ -165,6 +165,25 @@ describe("explaining it back", () => {
     expect(T.contextFor(s, id).forceSplit).toBe(true);
     s = T.applyDecomposition(s, id, split("C", ["C1"]));
     expect(s.nodes[id].forceSplit).toBeUndefined();
+  });
+});
+
+describe("lesson questions", () => {
+  it("splits the confirming question off the lesson", () => {
+    expect(T.splitLesson("Body text.\n\n===CHECK===\nWhy does it work?")).toEqual({ body: "Body text.", question: "Why does it work?" });
+  });
+  it("hides a marker that is still streaming in", () => {
+    expect(T.splitLesson("Body text.\n===CH").body).toBe("Body text.");
+    expect(T.splitLesson("Body text.\n===CHECK===").body).toBe("Body text.");
+  });
+  it("reads the question from older lessons", () => {
+    expect(T.splitLesson("Body.\n\n### Check yourself\nWhy?")).toEqual({ body: "Body.", question: "Why?" });
+  });
+  it("falls back to asking for an explanation", () => {
+    const s = mapped();
+    expect(T.questionFor(byTitle(s, "A"))).toContain("Explain A in your own words");
+    const withLesson = T.setChat(s, byTitle(s, "C").id, [{ role: "assistant", content: "Body.\n===CHECK===\nWhy C?" }]);
+    expect(T.questionFor(byTitle(withLesson, "C"))).toBe("Why C?");
   });
 });
 

@@ -8,22 +8,32 @@ interface Props {
   session: Session;
   node: TNode;
   update: (fn: (s: Session) => Session) => void;
-  onVerdict: (nodeId: string, text: string, result: ValidateResult) => void;
-  /** Open with the "explain it back" box showing. */
-  startExplaining?: boolean;
+  onVerdict: (nodeId: string, question: string, answer: string, result: ValidateResult) => void;
+  /** Open with the confirming question showing. */
+  startAnswering?: boolean;
 }
 
 const STATUS_LABEL = { pending: "To learn", known: "Already knew", learned: "Understood" } as const;
 
-export function NodeView({ session, node, update, onVerdict, startExplaining }: Props) {
+/**
+ * idle      – lesson shown; "I understand" / "I don't understand"
+ * answering – the confirming question, with a box for the answer (skippable)
+ * stuck     – ask a question about the lesson, or break the piece down
+ */
+type Mode = "idle" | "answering" | "stuck";
+
+export function NodeView({ session, node, update, onVerdict, startAnswering }: Props) {
   const learnable = T.isLearnable(session, node);
   const children = T.kids(session, node.id);
   const locked = T.lockedIn(node);
-  const lesson = node.chat[0]?.content;
+  const lesson = node.chat[0] ? T.splitLesson(node.chat[0].content).body : undefined;
+  const checkQuestion = T.questionFor(node);
+
+  const [mode, setMode] = useState<Mode>(startAnswering ? "answering" : "idle");
 
   // ----- lesson + follow-ups (streamed) -----
   const [stream, setStream] = useState<string | null>(null);
-  const [question, setQuestion] = useState<string | null>(null);
+  const [asked, setAsked] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -58,7 +68,7 @@ export function NodeView({ session, node, update, onVerdict, startExplaining }: 
     const ac = new AbortController();
     abortRef.current = ac;
     setDraft("");
-    setQuestion(q);
+    setAsked(q);
     setStream("");
     setError(null);
     const chat = [...node.chat, { role: "user" as const, content: q }];
@@ -72,25 +82,24 @@ export function NodeView({ session, node, update, onVerdict, startExplaining }: 
       })
       .finally(() => {
         setStream(null);
-        setQuestion(null);
+        setAsked(null);
       });
   }
 
-  // ----- explain it back -----
-  const [explaining, setExplaining] = useState(!!startExplaining);
-  const [explanation, setExplanation] = useState("");
+  // ----- confirming question -----
+  const [answer, setAnswer] = useState("");
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
-  const [showLesson, setShowLesson] = useState(true);
+  const [showLesson, setShowLesson] = useState(false);
 
   async function check(e: React.FormEvent) {
     e.preventDefault();
-    const text = explanation.trim();
+    const text = answer.trim();
     if (!text || checking) return;
     setChecking(true);
     setCheckError(null);
     try {
-      onVerdict(node.id, text, await api.validate(T.contextFor(session, node.id), lesson, text));
+      onVerdict(node.id, checkQuestion, text, await api.validate(T.contextFor(session, node.id), lesson, checkQuestion, text));
     } catch (err) {
       setCheckError((err as Error).message);
       setChecking(false);
@@ -98,8 +107,14 @@ export function NodeView({ session, node, update, onVerdict, startExplaining }: 
   }
 
   const busy = stream !== null;
-  const canExplain = learnable ? !!lesson && !busy : node.status !== "pending";
+  const lessonReady = !!lesson && !(busy && node.chat.length === 0);
+  const answering = mode === "answering";
   const path = T.ancestors(session, node.id);
+  const breakDownButton = node.children.length === 0 && (
+    <button className="btn ghost" disabled={busy} onClick={() => update((s) => T.breakDown(s, node.id))}>
+      Break this down further
+    </button>
+  );
 
   return (
     <article className="card node-view">
@@ -107,7 +122,7 @@ export function NodeView({ session, node, update, onVerdict, startExplaining }: 
       <div className="node-head">
         <h1>{node.title}</h1>
         <span className={`chip ${node.status}${locked ? " locked" : ""}`}>
-          {locked ? "Explained back ✓" : STATUS_LABEL[node.status]}
+          {locked ? "Confirmed ✓" : STATUS_LABEL[node.status]}
         </span>
       </div>
       {node.description && <p className="lede">{node.description}</p>}
@@ -133,20 +148,18 @@ export function NodeView({ session, node, update, onVerdict, startExplaining }: 
         </div>
       )}
 
-      {/* While explaining, the lesson is hidden so the explanation comes from memory. */}
-      {explaining && lesson ? (
-        <button className="link-btn" onClick={() => setShowLesson((v) => !v)}>
-          {showLesson ? "Hide the lesson while I write" : "Peek at the lesson"}
-        </button>
-      ) : null}
-
-      {(!explaining || showLesson) && (
+      {/* While answering, the lesson is tucked away so the answer comes from understanding, not the page. */}
+      {(!answering || showLesson) && (
         <div className="lesson">
           {node.chat.map((m, i) =>
-            m.role === "assistant" ? <Markdown key={i} text={m.content} /> : <p key={i} className="question">{m.content}</p>,
+            m.role === "assistant"
+              ? <Markdown key={i} text={i === 0 ? T.splitLesson(m.content).body : m.content} />
+              : <p key={i} className="question">{m.content}</p>,
           )}
-          {question && <p className="question">{question}</p>}
-          {busy && (stream ? <Markdown text={stream} /> : <p className="thinking">{node.chat.length ? "Thinking…" : "Preparing your lesson…"}</p>)}
+          {asked && <p className="question">{asked}</p>}
+          {busy && (stream
+            ? <Markdown text={node.chat.length ? stream : T.splitLesson(stream).body} />
+            : <p className="thinking">{node.chat.length ? "Thinking…" : "Preparing your lesson…"}</p>)}
         </div>
       )}
 
@@ -157,80 +170,99 @@ export function NodeView({ session, node, update, onVerdict, startExplaining }: 
         </div>
       )}
 
-      {learnable && lesson && !explaining && (
-        <form className="ask" onSubmit={ask}>
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Ask a question about this…"
-            aria-label="Ask a follow-up question"
-            disabled={busy}
-          />
-          <button className="btn ghost" disabled={busy || !draft.trim()}>Ask</button>
-        </form>
-      )}
-
-      {locked && !explaining && (
+      {locked && !answering && (
         <div className="locked-box">
-          <b>Your locked-in explanation</b>
+          <b>Your locked-in answer</b>
+          {locked.question && <p className="locked-q">{locked.question}</p>}
           <p>{locked.text}</p>
         </div>
       )}
 
-      {explaining ? (
-        <form className="explain" onSubmit={check}>
-          <label htmlFor="explanation">
-            <b>Explain {node.title} in your own words</b>
-            <span>Write as if teaching someone new to it. Your explanation is saved, and if it holds up it's locked in.</span>
+      {/* ----- what next ----- */}
+      {answering ? (
+        <form className="prompt explain" onSubmit={check}>
+          <label htmlFor="answer">
+            <span>{learnable ? "Answer this to confirm you've got it and lock it in. It's optional." : "Answer this to lock it in."}</span>
+            <p className="check-q">{checkQuestion}</p>
           </label>
           <textarea
-            id="explanation"
-            value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
-            rows={7}
+            id="answer"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            rows={6}
             autoFocus
             disabled={checking}
-            placeholder="In plain language: what is it, how does it work, and why does it matter?"
+            placeholder="In your own words…"
           />
+          {lesson && (
+            <button type="button" className="link-btn" style={{ alignSelf: "flex-start" }} onClick={() => setShowLesson((v) => !v)}>
+              {showLesson ? "Hide the lesson" : "Peek at the lesson"}
+            </button>
+          )}
           {checkError && <div className="note error">{checkError}</div>}
           <div className="actions">
-            <button className="btn primary" disabled={checking || !explanation.trim()}>
-              {checking ? "Checking…" : "Check my explanation"}
+            <button className="btn primary" disabled={checking || !answer.trim()}>
+              {checking ? "Checking…" : "Check my answer"}
             </button>
-            <button type="button" className="btn ghost" disabled={checking} onClick={() => setExplaining(false)}>Cancel</button>
+            {learnable ? (
+              <button type="button" className="btn" disabled={checking} onClick={() => update((s) => T.markLearned(s, node.id))}>
+                Skip and continue
+              </button>
+            ) : (
+              <button type="button" className="btn ghost" disabled={checking} onClick={() => setMode("idle")}>Cancel</button>
+            )}
+            {learnable && (
+              <button type="button" className="btn ghost" disabled={checking} onClick={() => { setMode("idle"); setShowLesson(false); }}>
+                Back to the lesson
+              </button>
+            )}
           </div>
         </form>
-      ) : (
+      ) : learnable ? (
+        lessonReady && (
+          mode === "stuck" ? (
+            <div className="prompt">
+              <b>What's not landing?</b>
+              <form className="ask" onSubmit={ask}>
+                <input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="Ask a question about this (optional)…"
+                  aria-label="Ask a question about this lesson"
+                  disabled={busy}
+                  autoFocus
+                />
+                <button className="btn" disabled={busy || !draft.trim()}>Ask</button>
+              </form>
+              <div className="actions">
+                <button className="btn primary" disabled={busy} onClick={() => setMode("answering")}>I understand now</button>
+                {breakDownButton}
+              </div>
+            </div>
+          ) : (
+            <div className="actions">
+              <button className="btn primary" disabled={busy} onClick={() => setMode("answering")}>I understand</button>
+              <button className="btn" disabled={busy} onClick={() => setMode("stuck")}>I don't understand</button>
+            </div>
+          )
+        )
+      ) : node.status !== "pending" ? (
         <div className="actions">
-          {learnable && (
-            <button className="btn primary" disabled={!lesson || busy} onClick={() => update((s) => T.markLearned(s, node.id))}>
-              I understand this
-            </button>
-          )}
-          {canExplain && (
-            <button className={`btn ${learnable ? "" : "primary"}`} onClick={() => { setExplaining(true); setShowLesson(false); }}>
-              {locked ? "Explain it again" : "Explain it back to lock it in"}
-            </button>
-          )}
-          {node.children.length === 0 && (learnable || node.status !== "pending") && (
-            <button className="btn ghost" disabled={busy} onClick={() => update((s) => T.breakDown(s, node.id))}>
-              Break this down further
-            </button>
-          )}
-          {node.status !== "pending" && (
-            <button className="btn ghost" onClick={() => update((s) => T.markUnlearned(s, node.id))}>
-              I need to relearn this
-            </button>
-          )}
+          <button className="btn primary" onClick={() => setMode("answering")}>
+            {locked ? "Answer it again" : "Answer a question to lock it in"}
+          </button>
+          <button className="btn ghost" onClick={() => update((s) => T.markUnlearned(s, node.id))}>I need to relearn this</button>
+          {breakDownButton}
         </div>
-      )}
+      ) : null}
 
-      {node.attempts.length > (locked ? 1 : 0) && !explaining && (
+      {node.attempts.length > (locked ? 1 : 0) && !answering && (
         <details className="attempts">
-          <summary>Past explanations ({node.attempts.length})</summary>
+          <summary>Past answers ({node.attempts.length})</summary>
           {[...node.attempts].reverse().map((a) => (
             <div key={a.at} className={`attempt ${a.passed ? "pass" : "fail"}`}>
               <div className="attempt-meta">{a.passed ? "Passed" : "Not yet"} · {new Date(a.at).toLocaleString()}</div>
+              {a.question && <p className="attempt-q">{a.question}</p>}
               <p>{a.text}</p>
               <p className="attempt-feedback">{a.feedback}</p>
             </div>

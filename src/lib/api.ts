@@ -16,8 +16,8 @@ async function friendly<T>(call: () => Promise<T>): Promise<T> {
 
 export const decompose = (ctx: NodeContext): Promise<DecomposeResult> => friendly(() => impl.decompose(ctx));
 
-export const validate = (ctx: NodeContext, lesson: string | undefined, explanation: string): Promise<ValidateResult> =>
-  friendly(() => impl.validate(ctx, lesson, explanation));
+export const validate = (ctx: NodeContext, lesson: string | undefined, question: string, answer: string): Promise<ValidateResult> =>
+  friendly(() => impl.validate(ctx, lesson, question, answer));
 
 /** Streams a lesson (or a follow-up answer when `chat` is non-empty). Resolves with the full text. */
 export const teach = (ctx: NodeContext, chat: ChatMessage[], onDelta: (text: string) => void, signal: AbortSignal): Promise<string> =>

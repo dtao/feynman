@@ -17,6 +17,8 @@ export interface ChatMessage {
 }
 
 export interface Attempt {
+  /** The question that was answered. */
+  question?: string;
   text: string;
   passed: boolean;
   feedback: string;
@@ -32,9 +34,9 @@ export interface TNode {
   children: string[];
   status: Status;
   expansion: Expansion;
-  /** chat[0] is the lesson; the rest are follow-up questions and answers. */
+  /** chat[0] is the lesson (with its confirming question after CHECK_MARK); the rest are follow-ups. */
   chat: ChatMessage[];
-  /** Every "explain it back" attempt. The latest passing one is the locked-in explanation. */
+  /** Every answer to a confirming question. The latest passing one is the locked-in answer. */
   attempts: Attempt[];
   /** Feedback from a failed check, used to focus the next lesson. */
   reviewNote?: string;

@@ -47,7 +47,7 @@ export function TreeView({ session, activeId, onSelect, visible }: Props) {
             <span><i className="dot pending" /> to learn</span>
             <span><i className="dot known" /> already knew</span>
             <span><i className="dot learned" /> understood</span>
-            <span><i className="dot learned locked" /> explained back</span>
+            <span><i className="dot learned locked" /> confirmed</span>
           </span>
         </div>
       </header>
@@ -80,7 +80,7 @@ export function TreeView({ session, activeId, onSelect, visible }: Props) {
                 title={node.description || node.title}
               >
                 <span className="tnode-title">{node.title || "…"}</span>
-                {T.lockedIn(node) && <span className="badge" aria-label="explained back">✓</span>}
+                {T.lockedIn(node) && <span className="badge" aria-label="confirmed">✓</span>}
               </button>
             );
           })}

@@ -6,13 +6,16 @@ An app for learning complex things by breaking them down until you hit what you 
 2. **Tick what you already understand.** The app then goes depth-first: it takes the first component you don't
    know, breaks it down, asks again, and keeps descending until it reaches a piece small enough to teach directly.
 3. **Learn bottom-up, one branch at a time.** Lessons start at the lowest pieces and work up, each building on
-   the pieces beneath it. A component is fully understood before the next one is even broken down. You can ask
-   follow-up questions, or ask for a piece to be broken down further.
-4. **Watch the map light up.** The tree of everything you need starts gray and turns green as you understand
+   the pieces beneath it. A component is fully understood before the next one is even broken down.
+4. **Say whether it landed.** After each lesson you choose "I understand" or "I don't understand". If you don't,
+   you can ask a question about the lesson or have the piece broken down further.
+5. **Confirm it with a question (optional).** When you say you understand, the app asks one question about the
+   piece. A good answer locks it in, and your answer is saved so you can reread it later. A poor one sends you
+   back one level: the components your answer was shaky on turn gray again and are re-taught (or broken down,
+   if you had said you already knew them). You can skip the question, and you can answer it later for any piece
+   on the map, including the topic as a whole at the end.
+6. **Watch the map light up.** The tree of everything you need starts gray and turns green as you understand
    each piece. At the end it is a picture of everything you learned.
-5. **Explain it back (optional, at any level).** Write the idea in your own words and the app checks it. A pass
-   locks your explanation in so you can reread it later. A fail sends you back one level: the components your
-   explanation was shaky on turn gray again and are re-taught (or broken down, if you had said you already knew them).
 
 ## Run it
 

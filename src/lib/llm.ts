@@ -3,6 +3,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import type { ChatMessage, DecomposeResult, NodeContext, ValidateResult } from "../types.ts";
 import { loadKey } from "./store.ts";
+import { CHECK_MARK } from "./tree.ts";
 
 const MODEL = import.meta.env.VITE_FEYNMAN_MODEL || "claude-opus-5-5";
 // If a safety classifier declines a request, let the API retry it on a fallback model.
@@ -44,7 +45,7 @@ function describeContext(ctx: NodeContext): string {
         c.status === "known" ? "learner says they already knew this" :
         c.status === "learned" ? "just learned" : "not yet learned";
       lines.push(`${i}. ${c.title} — ${c.description} [${how}]`);
-      if (c.explanation) lines.push(`   The learner's own explanation of it: """${c.explanation}"""`);
+      if (c.explanation) lines.push(`   The learner's own confirmed answer about it: """${c.explanation}"""`);
     });
   }
   if (ctx.known.length) {
@@ -113,16 +114,16 @@ How to teach it:
 - Say why the concept matters for the topic the learner is ultimately after.
 - The app already shows the concept's name as the page heading, so start with the explanation itself rather than a title.
 - Keep the lesson to roughly 250–450 words. Use short paragraphs; use a list or a small table only where the content has that shape. Write maths with $…$ and $$…$$.
-- End with one question, under the heading "Check yourself", that the learner could only answer by understanding the idea rather than recalling a phrase. Do not answer it.
+- After the lesson, on a line of its own, write exactly ${CHECK_MARK} and then one question. The app hides this question while the learner reads; once they say they understand, it asks them to answer it in writing and checks the answer, and a good answer is what confirms their understanding. So choose a question that can only be answered well by someone who understands this concept: asking them to explain why or how, predict what happens in a new case, or apply the idea, never to recall a phrase from the lesson. It must be answerable in a few sentences from this lesson and its components alone. Do not mention the question in the lesson and do not answer it.
 - If you are given notes from a failed understanding check, open by addressing those gaps directly and take a different angle from a standard textbook explanation.
 
-After the lesson the learner may ask follow-up questions. Answer them directly and briefly, staying on this concept and at this level.`;
+After the lesson the learner may ask follow-up questions because something did not land. Answer them directly and briefly, staying on this concept and at this level, without giving away the answer to your closing question. Follow-up answers have no closing question and no ${CHECK_MARK} line.`;
 
 /** Streams a lesson, or a follow-up answer when `chat` is non-empty. Resolves with the full text. */
 export async function teach(ctx: NodeContext, chat: ChatMessage[], onDelta: (text: string) => void, signal: AbortSignal): Promise<string> {
   let first = `${describeContext(ctx)}\n\nTeach me: ${ctx.title}`;
   if (ctx.reviewNote) {
-    first += `\n\nI tried to explain this back and did not pass. Notes from that check: """${ctx.reviewNote}"""`;
+    first += `\n\nI answered a question about this and did not pass. Notes from that check: """${ctx.reviewNote}"""`;
   }
   const stream = client().beta.messages.stream(
     {
@@ -156,23 +157,24 @@ const ValidateSchema = z.object({
   weakComponents: z.array(z.number().int()),
 });
 
-const VALIDATE_SYSTEM = `You check whether a learner really understands a concept, based on their own written explanation of it. This is the final step of the Feynman technique: if they can explain it simply and correctly, they understand it.
+const VALIDATE_SYSTEM = `You check whether a learner really understands a concept, based on their written answer to one question about it. The learner has just said they understand the concept; answering this question well is how they confirm it, and the app then records their answer as "locked in". Sometimes the question is simply a request to explain the concept in their own words.
 
 Judge understanding, not polish:
-- Pass an explanation that gets the core idea right, covers the essential parts at the level this concept sits at in the tree, and shows how those parts connect. Informal wording, missing jargon, and omitted side details are fine.
-- Fail an explanation that contains a real misconception, leaves out something essential to the idea, only restates the name or definition without showing how it works, or is too vague to tell.
-- Judge against what the concept actually is. The lesson the learner was given is included for reference when there is one, but a correct explanation that differs from the lesson passes.
+- Pass an answer that responds to the question correctly and shows the learner grasps the idea behind it: the reasoning is sound and the essential parts are there. Informal wording, missing jargon, and omitted side details are fine.
+- Fail an answer that contains a real misconception, misses something the question depends on, restates the question or a definition without showing how the idea works, or is too vague to tell.
+- Judge against what the concept actually is. The lesson the learner was given is included for reference when there is one, but a correct answer that differs from the lesson passes.
 
 Return:
 - "passed": your verdict.
-- "feedback": two to four sentences addressed to the learner as "you". Say what they got right, then, if they failed, exactly what is wrong or missing. Do not give away the full correct explanation when they failed; point at the gap.
+- "feedback": two to four sentences addressed to the learner as "you". Say what they got right, then, if they failed, exactly what is wrong or missing. Do not give away the full correct answer when they failed; point at the gap.
 - "gaps": the specific misunderstandings or omissions, one short phrase each. Empty when they passed cleanly.
-- "weakComponents": the index numbers of the listed components that the explanation shows the learner is shaky on. When the learner failed and the concept has components, name at least one, choosing the component most responsible for the failure; the app sends the learner back to review those. Empty when they passed or when the concept has no components.`;
+- "weakComponents": the index numbers of the listed components that the answer shows the learner is shaky on. When the learner failed and the concept has components, name at least one, choosing the component most responsible for the failure; the app sends the learner back to review those. Empty when they passed or when the concept has no components.`;
 
-export async function validate(ctx: NodeContext, lesson: string | undefined, explanation: string): Promise<ValidateResult> {
+export async function validate(ctx: NodeContext, lesson: string | undefined, question: string, answer: string): Promise<ValidateResult> {
   const parts = [describeContext(ctx)];
   if (lesson) parts.push(`The lesson the learner was given:\n"""${lesson}"""`);
-  parts.push(`The learner's explanation of "${ctx.title}":\n"""${explanation}"""`);
+  parts.push(`The question the learner was asked about "${ctx.title}":\n"""${question}"""`);
+  parts.push(`The learner's answer:\n"""${answer}"""`);
 
   const response = await client().beta.messages.parse({
     model: MODEL,
@@ -183,7 +185,7 @@ export async function validate(ctx: NodeContext, lesson: string | undefined, exp
     system: VALIDATE_SYSTEM,
     messages: [{ role: "user", content: parts.join("\n\n") }],
   });
-  if (response.stop_reason === "refusal") throw new Error("The model declined to check this explanation.");
+  if (response.stop_reason === "refusal") throw new Error("The model declined to check this answer.");
   const out = response.parsed_output;
   if (!out) throw new Error("The model returned a verdict the app could not read. Try again.");
   const weak = out.passed ? [] : [...new Set(out.weakComponents)].filter((i) => i >= 0 && i < ctx.children.length);

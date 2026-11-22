@@ -30,7 +30,7 @@ export async function teach(ctx: NodeContext, chat: ChatMessage[], onDelta: (tex
           ? `You now know ${ctx.children.map((c) => `**${c.title}**`).join(", ")}. Together they give you this idea.`
           : `This is a building block, so we start from scratch.`,
         `Think of it like a recipe: each step is simple, and the dish is what you get when they run in order. In symbols, $a^2 + b^2 = c^2$.`,
-        `### Check yourself\nWhy would the whole thing fail if one step were missing?`,
+        `===CHECK===\nWhy would ${ctx.title} fail if one step were missing?`,
       ].filter(Boolean).join("\n\n");
   for (const word of text.split(/(?<=\s)/)) {
     await sleep(DELAY / 30);
@@ -40,8 +40,8 @@ export async function teach(ctx: NodeContext, chat: ChatMessage[], onDelta: (tex
   return text;
 }
 
-/** Passes unless the explanation is very short or contains "wrong". */
-export async function validate(ctx: NodeContext, _lesson: string | undefined, explanation: string): Promise<ValidateResult> {
+/** Passes unless the answer is very short or contains "wrong". */
+export async function validate(ctx: NodeContext, _lesson: string | undefined, _question: string, explanation: string): Promise<ValidateResult> {
   await sleep(DELAY);
   const passed = explanation.trim().length >= 40 && !/wrong/i.test(explanation);
   return passed

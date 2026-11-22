@@ -177,6 +177,26 @@ export function normalize(s: Session): Session {
 
 // ---------- learning ----------
 
+/** The lesson text ends with this line, followed by the question used to confirm understanding. */
+export const CHECK_MARK = "===CHECK===";
+
+/** Separates a lesson from its confirming question. Safe to call on a lesson that is still streaming in. */
+export function splitLesson(text: string): { body: string; question?: string } {
+  const i = text.indexOf(CHECK_MARK);
+  if (i >= 0) return { body: text.slice(0, i).trimEnd(), question: text.slice(i + CHECK_MARK.length).trim() || undefined };
+  // Lessons written before the question was split out ended with a "Check yourself" heading.
+  const old = text.match(/\n#{1,6}\s*Check yourself\s*\n/i);
+  if (old) return { body: text.slice(0, old.index).trimEnd(), question: text.slice(old.index! + old[0].length).trim() || undefined };
+  // Hide a marker that has only partly arrived.
+  return { body: text.replace(/\n={1,3}[A-Z]{0,5}={0,3}\s*$/, "") };
+}
+
+/** What to ask when a piece has no lesson question (for example one I said I already knew). */
+export const fallbackQuestion = (n: TNode) =>
+  `Explain ${n.title} in your own words: what is it, how does it work, and why does it matter?`;
+
+export const questionFor = (n: TNode) => (n.chat[0] && splitLesson(n.chat[0].content).question) || fallbackQuestion(n);
+
 export const setChat = (s: Session, id: string, chat: ChatMessage[]) => patch(s, id, { chat });
 
 export const markLearned = (s: Session, id: string) => patch(s, id, { status: "learned", reviewNote: undefined });
@@ -186,13 +206,13 @@ export const markUnlearned = (s: Session, id: string, note?: string) =>
   patch(s, id, { status: "pending", chat: [], reviewNote: note });
 
 /**
- * Record an "explain it back" attempt. A pass locks the explanation in. A fail sends me back one
+ * Record an answer to a confirming question. A pass locks the answer in. A fail sends me back one
  * level: the node and the components the check found shaky turn gray again and are re-taught.
  * Returns the ids I was sent back to.
  */
-export function applyValidation(s: Session, id: string, text: string, r: ValidateResult): { session: Session; sentBackTo: string[] } {
+export function applyValidation(s: Session, id: string, question: string, text: string, r: ValidateResult): { session: Session; sentBackTo: string[] } {
   const n = s.nodes[id];
-  const attempt: Attempt = { text, passed: r.passed, feedback: r.feedback, gaps: r.gaps, at: Date.now() };
+  const attempt: Attempt = { question, text, passed: r.passed, feedback: r.feedback, gaps: r.gaps, at: Date.now() };
   let next = patch(s, id, { attempts: [...n.attempts, attempt] });
   if (r.passed) return { session: markLearned(next, id), sentBackTo: [] };
 
@@ -200,7 +220,7 @@ export function applyValidation(s: Session, id: string, text: string, r: Validat
   next = markUnlearned(next, id, note);
   const weak = r.weakComponents.map((i) => n.children[i]).filter(Boolean);
   for (const c of weak) {
-    next = markUnlearned(next, c, `While explaining "${n.title}", these gaps showed up:\n${r.gaps.map((g) => `- ${g}`).join("\n") || r.feedback}`);
+    next = markUnlearned(next, c, `While answering a question about "${n.title}", these gaps showed up:\n${r.gaps.map((g) => `- ${g}`).join("\n") || r.feedback}`);
   }
   return { session: next, sentBackTo: weak };
 }

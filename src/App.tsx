@@ -81,9 +81,9 @@ export function App() {
   const keyDialog = <KeyDialog open={keyOpen} current={apiKey} onSave={changeKey} onClose={() => setKeyOpen(false)} />;
   const onKey = mock ? undefined : () => setKeyOpen(true);
 
-  function onVerdict(nodeId: string, text: string, result: ValidateResult) {
+  function onVerdict(nodeId: string, question: string, text: string, result: ValidateResult) {
     if (!session) return;
-    const { session: next, sentBackTo } = T.applyValidation(session, nodeId, text, result);
+    const { session: next, sentBackTo } = T.applyValidation(session, nodeId, question, text, result);
     updateById(session.id, () => next);
     setVerdict({ title: session.nodes[nodeId].title, result, sentBackTo: sentBackTo.map((id) => session.nodes[id].title) });
     setSelected(null);
@@ -125,7 +125,7 @@ export function App() {
           node={shown}
           update={update}
           onVerdict={onVerdict}
-          startExplaining={picked ? selected?.explain : false}
+          startAnswering={picked ? selected?.explain : false}
         />
       </>
     );
@@ -143,23 +143,24 @@ export function App() {
         <div className="step">Complete</div>
         <h1>You've built up to {rootNode.title}</h1>
         <p className="lede">
-          {st.learned} {st.learned === 1 ? "piece" : "pieces"} learned here, {st.known} you already knew, {st.locked} explained back and locked in.
-          The map shows everything you now understand; select any piece to revisit it or explain it back.
+          {st.learned} {st.learned === 1 ? "piece" : "pieces"} learned here, {st.known} you already knew, {st.locked} confirmed by answering a question.
+          The map shows everything you now understand; select any piece to revisit it or confirm it.
         </p>
         {locked ? (
           <div className="locked-box">
-            <b>Your locked-in explanation of {rootNode.title}</b>
+            <b>Your locked-in answer on {rootNode.title}</b>
+            {locked.question && <p className="locked-q">{locked.question}</p>}
             <p>{locked.text}</p>
           </div>
         ) : (
           <p>
-            <b>One optional last step:</b> explain {rootNode.title} in your own words. If the explanation has gaps, you'll be sent back
-            one level to shore them up.
+            <b>One optional last step:</b> answer a question on {rootNode.title} to confirm you've got it. If your answer has gaps,
+            you'll be sent back one level to shore them up.
           </p>
         )}
         <div className="actions">
           <button className="btn primary" onClick={() => setSelected({ id: rootNode.id, explain: true })}>
-            {locked ? "Explain it again" : `Explain ${rootNode.title}`}
+            {locked ? "Answer it again" : "Answer a question to confirm"}
           </button>
           <button className="btn ghost" onClick={() => open(null)}>Start another topic</button>
         </div>
@@ -226,7 +227,7 @@ function VerdictCard({ verdict, onContinue }: { verdict: Verdict; onContinue: ()
             : <>You'll go through {title} again with these gaps in focus. If it still doesn't land, break it down further.</>}
         </p>
       )}
-      <p className="muted">Your explanation is saved with this piece either way.</p>
+      <p className="muted">Your answer is saved with this piece either way.</p>
       <div className="actions">
         <button className="btn primary" autoFocus onClick={onContinue}>Continue</button>
       </div>
