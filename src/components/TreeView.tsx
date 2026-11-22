@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Session, TNode } from "../types.ts";
 import * as T from "../lib/tree.ts";
+import { Inline } from "./Markdown.tsx";
 
 const W = 172, H = 46, GAP_X = 44, GAP_Y = 12, PAD = 16;
 
@@ -79,7 +80,7 @@ export function TreeView({ session, activeId, onSelect, visible }: Props) {
                 onClick={() => onSelect(node.id)}
                 title={node.description || node.title}
               >
-                <span className="tnode-title">{node.title || "…"}</span>
+                <span className="tnode-title"><Inline text={node.title || "…"} /></span>
                 {T.lockedIn(node) && <span className="badge" aria-label="confirmed">✓</span>}
               </button>
             );

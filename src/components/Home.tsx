@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Session } from "../types.ts";
 import * as T from "../lib/tree.ts";
+import { Inline } from "./Markdown.tsx";
 
 interface Props {
   sessions: Session[];
@@ -44,7 +45,7 @@ export function Home({ sessions, onStart, onOpen, onDelete }: Props) {
               return (
                 <li key={s.id}>
                   <button className="topic" onClick={() => onOpen(s.id)}>
-                    <b>{T.root(s).title || s.goal}</b>
+                    <b><Inline text={T.root(s).title || s.goal} /></b>
                     <small>
                       {ph === "complete" ? "Understood" : ph === "mapping" ? "Mapping" : "Learning"} · {st.known + st.learned} of {st.total} pieces
                     </small>

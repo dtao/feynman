@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Session, TNode, ValidateResult } from "../types.ts";
 import * as T from "../lib/tree.ts";
 import * as api from "../lib/api.ts";
-import { Markdown } from "./Markdown.tsx";
+import { Inline, Markdown } from "./Markdown.tsx";
 
 interface Props {
   session: Session;
@@ -118,18 +118,18 @@ export function NodeView({ session, node, update, onVerdict, startAnswering }: P
 
   return (
     <article className="card node-view">
-      {path.length > 0 && <div className="crumbs">{path.map((a) => a.title).join("  ›  ")}</div>}
+      {path.length > 0 && <div className="crumbs">{path.map((a, i) => <span key={a.id}>{i > 0 && "  ›  "}<Inline text={a.title} /></span>)}</div>}
       <div className="node-head">
-        <h1>{node.title}</h1>
+        <h1><Inline text={node.title} /></h1>
         <span className={`chip ${node.status}${locked ? " locked" : ""}`}>
           {locked ? "Confirmed ✓" : STATUS_LABEL[node.status]}
         </span>
       </div>
-      {node.description && <p className="lede">{node.description}</p>}
+      {node.description && <p className="lede"><Inline text={node.description} /></p>}
 
       {children.length > 0 && (
         <p className="built-from">
-          Built from: {children.map((c, i) => <span key={c.id}>{i > 0 && ", "}<b>{c.title}</b></span>)}
+          Built from: {children.map((c, i) => <span key={c.id}>{i > 0 && ", "}<b><Inline text={c.title} /></b></span>)}
         </p>
       )}
 
@@ -173,7 +173,7 @@ export function NodeView({ session, node, update, onVerdict, startAnswering }: P
       {locked && !answering && (
         <div className="locked-box">
           <b>Your locked-in answer</b>
-          {locked.question && <p className="locked-q">{locked.question}</p>}
+          {locked.question && <p className="locked-q"><Inline text={locked.question} /></p>}
           <p>{locked.text}</p>
         </div>
       )}
@@ -183,8 +183,8 @@ export function NodeView({ session, node, update, onVerdict, startAnswering }: P
         <form className="prompt explain" onSubmit={check}>
           <label htmlFor="answer">
             <span>{learnable ? "Answer this to confirm you've got it and lock it in. It's optional." : "Answer this to lock it in."}</span>
-            <p className="check-q">{checkQuestion}</p>
           </label>
+          <p className="check-q"><Inline text={checkQuestion} /></p>
           <textarea
             id="answer"
             value={answer}
@@ -262,9 +262,9 @@ export function NodeView({ session, node, update, onVerdict, startAnswering }: P
           {[...node.attempts].reverse().map((a) => (
             <div key={a.at} className={`attempt ${a.passed ? "pass" : "fail"}`}>
               <div className="attempt-meta">{a.passed ? "Passed" : "Not yet"} · {new Date(a.at).toLocaleString()}</div>
-              {a.question && <p className="attempt-q">{a.question}</p>}
+              {a.question && <p className="attempt-q"><Inline text={a.question} /></p>}
               <p>{a.text}</p>
-              <p className="attempt-feedback">{a.feedback}</p>
+              <p className="attempt-feedback"><Inline text={a.feedback} /></p>
             </div>
           ))}
         </details>

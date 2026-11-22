@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Session, TNode } from "../types.ts";
 import * as T from "../lib/tree.ts";
+import { Inline } from "./Markdown.tsx";
 
 interface Props {
   session: Session;
@@ -15,14 +16,14 @@ export function Mapping({ session, step, update }: Props & { step: T.Step }) {
       {step.kind === "triage" && <Triage key={step.node.id} session={session} node={step.node} update={update} />}
       {failed.map((n) => (
         <div key={n.id} className="card note error">
-          Couldn't break down <b>{n.title || "your topic"}</b>: {n.error}{" "}
+          Couldn't break down <b><Inline text={n.title || "your topic"} /></b>: {n.error}{" "}
           <button className="link-btn" onClick={() => update((s) => T.setExpansion(s, n.id, "none"))}>Try again</button>
         </div>
       ))}
       {step.kind === "wait" && step.node.expansion !== "error" && (
         <div className="card">
           <p className="thinking">
-            {step.node.title ? <>Breaking down {step.node.title}…</> : <>Working out what "{session.goal}" is built from…</>}
+            {step.node.title ? <>Breaking down <Inline text={step.node.title} />…</> : <>Working out what "{session.goal}" is built from…</>}
           </p>
         </div>
       )}
@@ -45,9 +46,9 @@ function Triage({ session, node, update }: Props & { node: TNode }) {
 
   return (
     <article className="card triage">
-      {!isRoot && <div className="crumbs">{[...T.ancestors(session, node.id), node].map((a) => a.title).join("  ›  ")}</div>}
-      <h1>{node.title}</h1>
-      {node.description && <p className="lede">{node.description}</p>}
+      {!isRoot && <div className="crumbs">{[...T.ancestors(session, node.id), node].map((a, i) => <span key={a.id}>{i > 0 && "  ›  "}<Inline text={a.title} /></span>)}</div>}
+      <h1><Inline text={node.title} /></h1>
+      {node.description && <p className="lede"><Inline text={node.description} /></p>}
       <p>
         {isRoot ? "It's built from these pieces. " : "To understand this, you need these pieces. "}
         <b>Tick the ones you already understand</b>. You'll work through the rest one at a time, each broken down as far as it needs.
@@ -58,8 +59,8 @@ function Triage({ session, node, update }: Props & { node: TNode }) {
             <label className={known.has(c.id) ? "checked" : ""}>
               <input type="checkbox" checked={known.has(c.id)} onChange={() => toggle(c.id)} />
               <span>
-                <b>{c.title}</b>
-                <small>{c.description}</small>
+                <b><Inline text={c.title} /></b>
+                <small><Inline text={c.description} /></small>
               </span>
             </label>
           </li>

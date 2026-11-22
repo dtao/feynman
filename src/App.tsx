@@ -8,6 +8,7 @@ import { Home } from "./components/Home.tsx";
 import { Mapping } from "./components/Mapping.tsx";
 import { NodeView } from "./components/NodeView.tsx";
 import { TreeView } from "./components/TreeView.tsx";
+import { Inline } from "./components/Markdown.tsx";
 
 const MAX_PARALLEL_BREAKDOWNS = 4;
 
@@ -141,20 +142,20 @@ export function App() {
     main = (
       <article className="card summary">
         <div className="step">Complete</div>
-        <h1>You've built up to {rootNode.title}</h1>
+        <h1>You've built up to <Inline text={rootNode.title} /></h1>
         <p className="lede">
           {st.learned} {st.learned === 1 ? "piece" : "pieces"} learned here, {st.known} you already knew, {st.locked} confirmed by answering a question.
           The map shows everything you now understand; select any piece to revisit it or confirm it.
         </p>
         {locked ? (
           <div className="locked-box">
-            <b>Your locked-in answer on {rootNode.title}</b>
-            {locked.question && <p className="locked-q">{locked.question}</p>}
+            <b>Your locked-in answer on <Inline text={rootNode.title} /></b>
+            {locked.question && <p className="locked-q"><Inline text={locked.question} /></p>}
             <p>{locked.text}</p>
           </div>
         ) : (
           <p>
-            <b>One optional last step:</b> answer a question on {rootNode.title} to confirm you've got it. If your answer has gaps,
+            <b>One optional last step:</b> answer a question on <Inline text={rootNode.title} /> to confirm you've got it. If your answer has gaps,
             you'll be sent back one level to shore them up.
           </p>
         )}
@@ -202,7 +203,7 @@ function TopBar({ mock, hasKey, onKey, title, onHome }: { mock: boolean; hasKey:
   return (
     <header className="topbar">
       <button className="brand" onClick={onHome} disabled={!onHome}>Feynman</button>
-      <span className="topbar-title">{title}</span>
+      <span className="topbar-title">{title && <Inline text={title} />}</span>
       {mock && <span className="chip warn" title="Canned lessons, no AI calls (VITE_MOCK=1)">Mock mode</span>}
       {onHome && <button className="link-btn" onClick={onHome}>All topics</button>}
       {onKey && <button className="link-btn" onClick={onKey}>{hasKey ? "API key" : "Add API key"}</button>}
@@ -215,16 +216,16 @@ function VerdictCard({ verdict, onContinue }: { verdict: Verdict; onContinue: ()
   return (
     <article className={`card verdict ${result.passed ? "pass" : "fail"}`}>
       <div className="step">{result.passed ? "Locked in" : "Not quite yet"}</div>
-      <h1>{result.passed ? `You understand ${title}` : `Let's shore up ${title}`}</h1>
-      <p>{result.feedback}</p>
+      <h1>{result.passed ? "You understand " : "Let's shore up "}<Inline text={title} /></h1>
+      <p><Inline text={result.feedback} /></p>
       {result.gaps.length > 0 && (
-        <ul>{result.gaps.map((g) => <li key={g}>{g}</li>)}</ul>
+        <ul>{result.gaps.map((g) => <li key={g}><Inline text={g} /></li>)}</ul>
       )}
       {!result.passed && (
         <p className="note">
           {sentBackTo.length
-            ? <>Going back one level to review <b>{sentBackTo.join(", ")}</b>, then {title} again.</>
-            : <>You'll go through {title} again with these gaps in focus. If it still doesn't land, break it down further.</>}
+            ? <>Going back one level to review <b><Inline text={sentBackTo.join(", ")} /></b>, then <Inline text={title} /> again.</>
+            : <>You'll go through <Inline text={title} /> again with these gaps in focus. If it still doesn't land, break it down further.</>}
         </p>
       )}
       <p className="muted">Your answer is saved with this piece either way.</p>

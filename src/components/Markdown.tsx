@@ -11,3 +11,9 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
   const html = useMemo(() => DOMPurify.sanitize(marked.parse(text, { async: false })), [text]);
   return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
 });
+
+/** Model-written text that sits inside a line (titles, descriptions, questions, feedback): inline formatting and maths, no block elements. */
+export const Inline = memo(function Inline({ text }: { text: string }) {
+  const html = useMemo(() => DOMPurify.sanitize(marked.parseInline(text, { async: false })), [text]);
+  return <span className="md-inline" dangerouslySetInnerHTML={{ __html: html }} />;
+});

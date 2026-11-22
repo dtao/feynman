@@ -70,7 +70,7 @@ Given a concept, return the components someone must understand in order to under
 - Components are the ideas the concept is built from or depends on: its prerequisites and its parts. Each must be clearly simpler than the concept itself, so that the recursion bottoms out.
 - Give 2 to 6 components, in a sensible learning order. Prefer fewer, well-chosen ones; a learner has to work through every one.
 - Make them distinct from each other, and do not repeat the concept's ancestors or anything in the list of concepts already in the tree.
-- Component titles are short noun phrases (a few words). Descriptions are one plain sentence saying what the component is, written so the learner can judge honestly whether they already understand it.
+- Component titles are short noun phrases (a few words) in plain text. In descriptions, write any maths with $…$ and a literal dollar sign as \\$. Descriptions are one plain sentence saying what the component is, written so the learner can judge honestly whether they already understand it.
 - Set "atomic" to true, with an empty component list, when the concept can be taught in a single short lesson to a curious adult using only everyday knowledge plus the things the learner says they already understand. The deeper a concept is in the tree, the more readily it should be atomic; do not decompose down to trivia.
 - "title" is a concise name for the concept and "description" is one sentence on what it covers. When you are given the learner's raw request rather than a named concept, identify the topic they mean and name it; otherwise keep the given title, tidying it only if needed.`;
 
@@ -113,7 +113,7 @@ How to teach it:
 - Use one concrete example or analogy that carries real explanatory weight, and say where the analogy stops being accurate if it does.
 - Say why the concept matters for the topic the learner is ultimately after.
 - The app already shows the concept's name as the page heading, so start with the explanation itself rather than a title.
-- Keep the lesson to roughly 250–450 words. Use short paragraphs; use a list or a small table only where the content has that shape. Write maths with $…$ and $$…$$.
+- Keep the lesson to roughly 250–450 words. Use short paragraphs; use a list or a small table only where the content has that shape. Write maths with $…$ and $$…$$ (the closing question included), and write a literal dollar sign as \\$ so that prices are not read as maths.
 - After the lesson, on a line of its own, write exactly ${CHECK_MARK} and then one question. The app hides this question while the learner reads; once they say they understand, it asks them to answer it in writing and checks the answer, and a good answer is what confirms their understanding. So choose a question that can only be answered well by someone who understands this concept: asking them to explain why or how, predict what happens in a new case, or apply the idea, never to recall a phrase from the lesson. It must be answerable in a few sentences from this lesson and its components alone. Do not mention the question in the lesson and do not answer it.
 - If you are given notes from a failed understanding check, open by addressing those gaps directly and take a different angle from a standard textbook explanation.
 
@@ -167,6 +167,7 @@ Judge understanding, not polish:
 Return:
 - "passed": your verdict.
 - "feedback": two to four sentences addressed to the learner as "you". Say what they got right, then, if they failed, exactly what is wrong or missing. Do not give away the full correct answer when they failed; point at the gap.
+- In "feedback" and "gaps", write any maths with $…$ and a literal dollar sign as \\$.
 - "gaps": the specific misunderstandings or omissions, one short phrase each. Empty when they passed cleanly.
 - "weakComponents": the index numbers of the listed components that the answer shows the learner is shaky on. When the learner failed and the concept has components, name at least one, choosing the component most responsible for the failure; the app sends the learner back to review those. Empty when they passed or when the concept has no components.`;
 
