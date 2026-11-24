@@ -148,7 +148,7 @@ textarea, .ask input, .key-dialog input {
 .choices label:hover { border-color: var(--muted); }
 .choices label.checked { border-color: var(--green); background: var(--green-pale); }
 .choices input { margin-top: 5px; width: 17px; height: 17px; accent-color: var(--green); flex: none; }
-.choices span { display: flex; flex-direction: column; }
+.choices label > span { display: flex; flex-direction: column; min-width: 0; }
 .choices small { color: var(--muted); font-size: 0.9rem; }
 
 .verdict.pass { border-color: var(--green); }

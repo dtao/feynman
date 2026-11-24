@@ -16,7 +16,7 @@ export async function decompose(ctx: NodeContext): Promise<DecomposeResult> {
     atomic: false,
     components: Array.from({ length: n }, (_, i) => ({
       title: `${title} · part ${i + 1}`,
-      description: `The ${["first", "second", "third", "fourth"][i]} idea that ${title} is built from.`,
+      description: `The ${["first", "second", "third", "fourth"][i]} idea that ${title} is built from, with rules like $a^m \\cdot a^n = a^{m+n}$.`,
     })),
   };
 }
